@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Offline Health Tracker with Goals</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial; background:#f0f0f0; padding:20px; }
+    input, button { width:100%; padding:10px; margin:5px 0; }
+    #app { display:none; }
+    .entry { background:white; padding:10px; margin:5px 0; border-radius:5px; display:flex; justify-content: space-between; }
+    .deleteBtn { background:red; color:white; border:none; padding:3px 6px; cursor:pointer; border-radius:3px; }
+    .progressContainer { background:#ddd; width:100%; border-radius:5px; margin:5px 0; }
+    .progressBar { height:20px; background:green; width:0%; border-radius:5px; text-align:center; color:white; font-weight:bold; }
+  </style>
+</head>
+<body>
+
+<h2>Offline Health Tracker with Goals</h2>
+
+<div id="loginDiv">
+  <input id="username" placeholder="Username">
+  <input id="password" placeholder="Password" type="password">
+  <label><input type="checkbox" id="staySignedIn"> Stay Signed In</label>
+  <button onclick="login()">Log In / Sign Up</button>
+</div>
+
+<div id="app">
+  <h3 id="greeting"></h3>
+  <button onclick="logOff()">Log Off</button>
+
+  <h4>Set Your Daily Goals</h4>
+  <input id="stepsGoalInput" placeholder="Steps goal" type="number">
+  <input id="caloriesGoalInput" placeholder="Calories goal" type="number">
+  <button onclick="setGoals()">Set Goals</button>
+
+  <h4>Steps</h4>
+  <input id="stepsInput" placeholder="Enter steps today" type="number">
+  <button onclick="addSteps()">Add Steps</button>
+  <div id="stepsDisplay"></div>
+  <div class="progressContainer"><div id="stepsBar" class="progressBar">0%</div></div>
+
+  <h4>Food & Drinks</h4>
+  <input id="foodInput" placeholder="Enter food or drink">
+  <button onclick="addFood()">Add Food/Drink</button>
+  <div class="progressContainer"><div id="caloriesBar" class="progressBar">0%</div></div>
+
+  <h4>Today’s Data</h4>
+  <div id="foodDisplay"></div>
+</div>
+
+<script>
+let currentUser = "";
+const foodDatabase = {
+  "pizza": 285,
+  "burger": 295,
+  "sandwich": 150,
+  "steak": 679,
+  "platou": 500,
+  "water": 0,
+  "cola": 140,
+  "pepsi": 150,
+  "fanta": 160,
+  "milk": 120
+};
+
+// Auto-login if stay signed in
+window.onload = () => {
+  const savedUser = localStorage.getItem("staySignedInUser");
+  if(savedUser) {
+    currentUser = savedUser;
+    document.getElementById("loginDiv").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    document.getElementById("greeting").innerText = "Hello, " + currentUser;
+    loadData();
+  }
+}
+
+// Login / Sign Up
+function login(){
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value.trim();
+  const stay = document.getElementById("staySignedIn").checked;
+  if(!username || !password) return alert("Enter username and password");
+
+  let accounts = JSON.parse(localStorage.getItem("accounts") || "{}");
+  if(!accounts[username]){
+    accounts[username] = {password: password, steps: 0, food: [], stepsGoal: 10000, caloriesGoal: 2000};
+    localStorage.setItem("accounts", JSON.stringify(accounts));
+  } else {
+    if(accounts[username].password !== password) return alert("Wrong password");
+  }
+
+  currentUser = username;
+
+  if(stay){
+    localStorage.setItem("staySignedInUser", currentUser);
+  } else {
+    localStorage.removeItem("staySignedInUser");
+  }
+
+  document.getElementById("loginDiv").style.display = "none";
+  document.getElementById("app").style.display = "block";
+  document.getElementById("greeting").innerText = "Hello, " + username;
+  loadData();
+}
+
+// Log off
+function logOff(){
+  currentUser = "";
+  document.getElementById("loginDiv").style.display = "block";
+  document.getElementById("app").style.display = "none";
+  localStorage.removeItem("staySignedInUser");
+}
+
+// Set daily goals
+function setGoals(){
+  const stepsGoal = parseInt(document.getElementById("stepsGoalInput").value);
+  const caloriesGoal = parseInt(document.getElementById("caloriesGoalInput").value);
+  if(isNaN(stepsGoal) || stepsGoal<=0 || isNaN(caloriesGoal) || caloriesGoal<=0) return alert("Enter valid goals");
+
+  let accounts = JSON.parse(localStorage.getItem("accounts"));
+  accounts[currentUser].stepsGoal = stepsGoal;
+  accounts[currentUser].caloriesGoal = caloriesGoal;
+  localStorage.setItem("accounts", JSON.stringify(accounts));
+  loadData();
+}
+
+// Add steps
+function addSteps(){
+  let steps = parseInt(document.getElementById("stepsInput").value);
+  if(isNaN(steps) || steps<0) return alert("Enter valid steps");
+
+  let accounts = JSON.parse(localStorage.getItem("accounts"));
+  accounts[currentUser].steps += steps;
+  localStorage.setItem("accounts", JSON.stringify(accounts));
+  document.getElementById("stepsInput").value = "";
+  loadData();
+}
+
+// Delete steps
+function deleteSteps(){
+  if(!confirm("Do you want to reset steps?")) return;
+  let accounts = JSON.parse(localStorage.getItem("accounts"));
+  accounts[currentUser].steps = 0;
+  localStorage.setItem("accounts", JSON.stringify(accounts));
+  loadData();
+}
+
+// Add food
+function addFood(){
+  let food = document.getElementById("foodInput").value.trim().toLowerCase();
+  if(!food) return alert("Enter food or drink");
+
+  let calories = foodDatabase[food];
+  if(calories === undefined) return alert("Food/drink not recognized");
+
+  let accounts = JSON.parse(localStorage.getItem("accounts"));
+  accounts[currentUser].food.push({name: food, calories: calories});
+  localStorage.setItem("accounts", JSON.stringify(accounts));
+  document.getElementById("foodInput").value = "";
+  loadData();
+}
+
+// Delete food entry
+function deleteFood(index){
+  let accounts = JSON.parse(localStorage.getItem("accounts"));
+  accounts[currentUser].food.splice(index,1);
+  localStorage.setItem("accounts", JSON.stringify(accounts));
+  loadData();
+}
+
+// Load data
+function loadData(){
+  let accounts = JSON.parse(localStorage.getItem("accounts"));
+  let user = accounts[currentUser];
+
+  // Steps
+  const stepPercent = Math.min((user.steps / user.stepsGoal)*100,100);
+  document.getElementById("stepsDisplay").innerHTML = `Steps today: ${user.steps} / ${user.stepsGoal} <button class="deleteBtn" onclick="deleteSteps()">Reset Steps</button>`;
+  document.getElementById("stepsBar").style.width = stepPercent + "%";
+  document.getElementById("stepsBar").innerText = Math.round(stepPercent) + "%";
+
+  // Food & calories
+  let foodHTML = "";
+  let totalCalories = 0;
+  user.food.forEach((entry,i)=>{
+    foodHTML += `<div class="entry">${entry.name}: ${entry.calories} cal <button class="deleteBtn" onclick="deleteFood(${i})">Delete</button></div>`;
+    totalCalories += entry.calories;
+  });
+  const calPercent = Math.min((totalCalories / user.caloriesGoal)*100,100);
+  document.getElementById("caloriesBar").style.width = calPercent + "%";
+  document.getElementById("caloriesBar").innerText = Math.round(calPercent) + "%";
+
+  foodHTML += `<div><b>Total Calories:</b> ${totalCalories} / ${user.caloriesGoal}</div>`;
+  document.getElementById("foodDisplay").innerHTML = foodHTML;
+}
+</script>
+
+</body>
+</html>
+
